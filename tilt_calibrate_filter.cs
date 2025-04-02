@@ -12,13 +12,13 @@ public class TiltCalibration : IPositionedPipelineElement<IDeviceReport>
 
     public event Action<IDeviceReport>? Emit;
 
-    [Property("X^2 Coefficient"),DefaultPropertyValue(0.05)]
+    [Property("X^2 Coefficient"),DefaultPropertyValue(0.06)]
     public float X_sqr_coeff { get; set; }
-    [Property("Y^2 Coefficient"),DefaultPropertyValue(0.05)]
+    [Property("Y^2 Coefficient"),DefaultPropertyValue(0.06)]
     public float Y_sqr_coeff { get; set; }
-    [Property("X Coefficient"),DefaultPropertyValue(0.1)]
+    [Property("X Coefficient"),DefaultPropertyValue(0.5)]
     public float X_coeff { get; set; }
-    [Property("Y Coefficient"),DefaultPropertyValue(0.1)]
+    [Property("Y Coefficient"),DefaultPropertyValue(0.5)]
     public float Y_coeff { get; set; }
     [Property("XY Coefficient"),DefaultPropertyValue(0.05),ToolTip("Suppress the diagonal movement")]
     public float XY_coeff { get; set; }
