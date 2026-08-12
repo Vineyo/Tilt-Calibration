@@ -1,4 +1,5 @@
-﻿using OpenTabletDriver.Plugin.Attributes;
+﻿using OpenTabletDriver.Plugin;
+using OpenTabletDriver.Plugin.Attributes;
 using OpenTabletDriver.Plugin.Output;
 using OpenTabletDriver.Plugin.Tablet;
 using System.Numerics;
@@ -6,61 +7,55 @@ using System.Numerics;
 namespace tilt_calibrate;
 
 [PluginName("Tilt calibration")]
-public class TiltCalibration : IPositionedPipelineElement<IDeviceReport>
+public sealed class TiltCalibration : IPositionedPipelineElement<IDeviceReport>
 {
-    public PipelinePosition Position => PipelinePosition.PreTransform;
+    private CalibrationCoefficients? _coefficients;
+    private string _resultFilePath = string.Empty;
+    private bool _loadPending = true;
 
+    public PipelinePosition Position => PipelinePosition.PreTransform;
     public event Action<IDeviceReport>? Emit;
 
-    [Property("X^2 Coefficient"),DefaultPropertyValue(0.06)]
-    public float X_sqr_coeff { get; set; }
-    [Property("Y^2 Coefficient"),DefaultPropertyValue(0.06)]
-    public float Y_sqr_coeff { get; set; }
-    [Property("X Coefficient"),DefaultPropertyValue(0.5)]
-    public float X_coeff { get; set; }
-    [Property("Y Coefficient"),DefaultPropertyValue(0.5)]
-    public float Y_coeff { get; set; }
-    [Property("XY Coefficient"),DefaultPropertyValue(0.05),ToolTip("Suppress the diagonal movement")]
-    public float XY_coeff { get; set; }
-    // Any reports, including positionals, are received here
-    public void Consume(IDeviceReport report)
+    [Property("Extra result file location"), DefaultPropertyValue("")]
+    [ToolTip("Optional path to tilt-calibration-result.json. Leave empty to read it from the plugin directory.")]
+    public string ResultFilePath
     {
-        var tilt = new Vector2(0, 0);
-        if(report is ITiltReport tiltReport)
+        get => _resultFilePath;
+        set
         {
-            // Get the tilt values from the report
-            (tilt.X, tilt.Y) = (tiltReport.Tilt.X, tiltReport.Tilt.Y);
-        
-            if(report is ITabletReport tabletReport)
-            {
-                // Filter the tilt values using the model
-                var offset = Filter(tilt);
-                
-                // Update the report with the filtered values
-                var newPosition = new Vector2(tabletReport.Position.X-offset.X, tabletReport.Position.Y-offset.Y);
-                tabletReport.Position= newPosition;
-                // SendNotification($"Tilt: {tilt.X}, {tilt.Y}");
-                var returnReport = tabletReport;
-                Emit?.Invoke(returnReport);
-            }
-        }
-        else{
-            // Emit the report without modification
-            Emit?.Invoke(report);
+            _resultFilePath = value;
+            _loadPending = true;
         }
     }
-    
-    public Vector2 Filter(Vector2 input)
-    {
-        var result= new Vector2(
-            X_sqr_coeff * input.X * Math.Abs(input.X)+ 
-            X_coeff* input.X -
-            XY_coeff* input.X * Math.Abs(input.Y),
-            Y_sqr_coeff * input.Y * Math.Abs(input.Y) + 
-            Y_coeff * input.Y-
-            XY_coeff * input.Y * Math.Abs(input.X)
-        );
 
-        return result;
+    public void Consume(IDeviceReport report)
+    {
+        EnsureResultLoaded();
+
+        if (report is ITiltReport tiltReport && report is ITabletReport tabletReport && _coefficients is not null)
+        {
+            var offset = _coefficients.Predict(tiltReport.Tilt);
+            tabletReport.Position -= offset;
+        }
+
+        Emit?.Invoke(report);
+    }
+
+    private void EnsureResultLoaded()
+    {
+        if (!_loadPending)
+            return;
+
+        _loadPending = false;
+        try
+        {
+            var path = PluginResultPath.Resolve(_resultFilePath);
+            _coefficients = CalibrationFiles.LoadResult(path).Coefficients;
+        }
+        catch (Exception ex)
+        {
+            _coefficients = null;
+            Log.WriteNotify("Tilt calibration", $"Could not load calibration result: {ex.Message}", LogLevel.Error);
+        }
     }
 }
