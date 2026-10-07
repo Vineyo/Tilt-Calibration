@@ -54,6 +54,14 @@ Training requires:
 
 The filter automatically loads `tilt-calibration-result.json` and corrects incoming tablet positions. To recalibrate, run the trainer again and then reapply the filter so it reloads the result.
 
+### Tablets with built-in hover correction
+
+For tablets such as the Huion Kamvas Pro 16 that already compensate for tilt while hovering, enable **Stroke-relative correction** in the **Tilt calibration** filter and click **Apply**. This option is off by default.
+
+In this mode, hover reports (zero pressure) are unchanged. The first report with positive pressure and tilt data establishes the stroke's starting offset and is also unchanged. Later reports subtract only the change in predicted offset since that starting tilt. Lifting the pen resets the reference for the next stroke.
+
+Use the same calibration file and training procedure. For best results, keep the pen tip fixed, start with the pen upright, and maintain contact while collecting the tilt sweep. The filter subtracts `Predict(currentTilt) - Predict(startingTilt)`; it does not predict from the tilt difference, because the fitted model is nonlinear. This mode preserves the tablet's starting position rather than correcting an inaccurate initial placement.
+
 ## Custom result location
 
 Normally, no result path needs to be configured. If the plugin cannot resolve its installation directory, set **Extra result file location** to the same absolute JSON path in both **Tilt calibration trainer** and **Tilt calibration**.
